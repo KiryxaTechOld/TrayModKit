@@ -1,5 +1,6 @@
 # TrayModKit
 “TrayModKit” is an innovative set of mini-applications located in the system tray. It includes the following features:
+
 **- TrashTidy**: A mini trash bin that displays the fill level of the bin and allows you to clear it by pressing a button or on a schedule.
 **- VirtualTablesHelper**: A switcher between virtual desktops that simplifies navigation and management of your workspaces.
 **- CenteringHelper**: A tool for centering windows and applications on your desktop.
