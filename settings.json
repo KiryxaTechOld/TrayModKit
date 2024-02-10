@@ -1,4 +1,9 @@
 {
     "theme": "system",
-    "language": "en"
+    "language": "en",
+    "mini_apps": {
+        "bin": {
+            "switch_active": false
+        }
+    }
 }
