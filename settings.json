@@ -3,7 +3,7 @@
     "language": "en",
     "mini_apps": {
         "bin": {
-            "switch_active": false
+            "switch_active": true
         }
     }
 }

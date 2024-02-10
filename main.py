@@ -1,3 +1,5 @@
+import time
+import threading
 import json
 
 from PIL import Image
@@ -6,7 +8,9 @@ from customtkinter import CTkFrame, CTkButton, CTkLabel, CTkImage
 
 colors = {
     'border': ('#cacaca', '#303030'),
-    'dark_frame': ('#cacaca', '#2b2b2b')
+    'dark_frame': ('#cacaca', '#2b2b2b'),
+    'transparent': 'transparent',
+    'active_button': '#144870'
 }
 
 
@@ -22,46 +26,90 @@ def get_settings() -> dict:
         return json.load(file)
 
 
+class Switch(CTkButton):
+    def __init__(self, master, mini_app_name) -> None:
+        self.mini_app_name = mini_app_name
+        self.is_active = get_settings()['mini_apps'][mini_app_name]['switch_active']
+        
+        super().__init__(
+            master,
+            text='',
+            width=10,
+            height=10,
+            image=self.get_icon(),
+            hover=False,
+            fg_color=colors['transparent'],
+            command=self.toggle
+        )
+
+    def toggle(self):
+        self.is_active = not self.is_active
+        self.configure(image=self.get_icon())
+        
+        settings = get_settings()
+        settings['mini_apps'][self.mini_app_name]['switch_active'] = self.is_active
+        set_settings(settings)
+        
+    def get_icon(self):
+        icon_name = 'enabled' if self.is_active else 'disabled'
+        return CTkImage(
+            light_image=Image.open(f'icons\\light\\switch_{icon_name}.png'),
+            dark_image=Image.open(f'icons\\dark\\switch_{icon_name}.png'),
+            size=(40, 22)
+        )
+
+
 class RightMenuButton(CTkButton):
     """Custom button for the right menu."""
-    # Static variable to keep track of the number of widgets created
-    widget_count = 0
+    instances = []
+    widget_count = 0  # Static variable to keep track of the number of widgets created
 
-    def __init__(self, master, icon_name):
+    def __init__(self, master, icon_name, linked_page):
         """Initialize the button with an icon."""
+        RightMenuButton.instances.append(self)
+        
         super().__init__(
             master=master,
-            text='',
             width=40,
             height=40,
-            # Load images for the button
-            image=CTkImage(
-                light_image=Image.open(f'icons\\{icon_name}.png'),
-                dark_image=Image.open(f'icons\\{icon_name}.png')
-            ),
-            fg_color='transparent'
+            fg_color=colors['transparent'],
+            text='',
+            image=self.load_icon(icon_name),
+            command=lambda: self.active_self(linked_page)
         )
 
     def place_by_index(self, flags=None) -> None:
         """Place the button at a position calculated based on its index."""
-        if flags == 'toend':
-            self.place(x=5, y=255)
-            return
-
-        # Calculate the position of the button based on the index
         x = 5
-        y = 5 + 40 * RightMenuButton.get_widget_count()
-
-        # Place the button at the calculated position
+        y = 5 + 40 * RightMenuButton.widget_count if flags != 'toend' else 255
         self.place(x=x, y=y)
+        RightMenuButton.widget_count += 1  # Increment the widget count after placing the button
 
-        # Increment the widget count after placing the button
-        RightMenuButton.widget_count += 1
-
-    @classmethod
-    def get_widget_count(cls) -> int:
-        """Return the current count of widgets created."""
-        return RightMenuButton.widget_count
+    @staticmethod
+    def load_icon(icon_name):
+        """Load the icon for the button."""
+        return CTkImage(
+            light_image=Image.open(f'icons\\{icon_name}.png'),
+            dark_image=Image.open(f'icons\\{icon_name}.png')
+        )
+       
+    @classmethod 
+    def this_active_and_other_disable(cls, page_frame):
+        PageFrame.set_page(page_frame)
+        
+    def set_color(self):
+        for instance in RightMenuButton.instances:
+            instance.configure(
+                fg_color=colors['transparent']
+            )
+        
+        self.configure(
+            fg_color=colors['active_button']
+        )
+        
+    def active_self(self, page_frame):
+        self.set_color()
+        RightMenuButton.this_active_and_other_disable(page_frame)
 
 
 class MiniAppFrame(CTkFrame):
@@ -86,12 +134,12 @@ class MiniAppFrame(CTkFrame):
         
         self.icon = CTkLabel(
             master=self,
+            text='',
             image=CTkImage(
                 light_image=Image.open(f'icons\\{icon_name}.png'),
                 dark_image=Image.open(f'icons\\{icon_name}.png'),
                 size=(15, 15)
-            ),
-            text='',
+            )
         )
         self.icon.place(x=10, y=4)
         
@@ -102,20 +150,7 @@ class MiniAppFrame(CTkFrame):
         )
         self.title_label.place(x=30, y=5)
         
-        self.switch = CTkButton(
-            master=self,
-            width=10,
-            height=10,
-            image=CTkImage(
-                light_image=Image.open('icons\\light\\switch_disabled.png'),
-                dark_image=Image.open('icons\\dark\\switch_disabled.png'),
-                size=(40, 22)
-            ),
-            hover=False,
-            fg_color='transparent',
-            text='',
-            command=self.set_switch_icon
-        )
+        self.switch = Switch(self, 'bin')
         self.switch.place(x=195, y=5)
         
     def set_switch_icon(self):
@@ -193,11 +228,12 @@ class PageFrame(CTkFrame):
         """Hide the frame."""
         self.place_forget()
 
-    def show_this_page_and_hide_other(self):
+    @classmethod
+    def set_page(cls, show_page):
         """Activate this page and hide all other pages."""
         for instance in PageFrame.instances:
-            if instance == self:
-                self.show()
+            if instance == show_page:
+                show_page.show()
             else:
                 instance.place_forget()
 
@@ -212,26 +248,7 @@ class Main:
         self.app.resizable(0, 0)  # Make the application non-resizable
         self.app.iconbitmap('icons\\main_icon.ico')  # Set the icon of the application
 
-        ctk.set_appearance_mode('light')  # Set the appearance mode of the application to light
-
-        # Create a frame for the right menu
-        self.right_menu_frame = CTkFrame(
-            master=self.app,
-            width=50,
-            height=300,
-            fg_color=('#cacaca', '#2b2b2b'),
-            corner_radius=0
-        )
-        self.right_menu_frame.place(x=0, y=0)  # Place the right menu frame at the top left corner
-
-        self.create_separated_line().place(x=49, y=0)  # Create a separated line and place it next to the right menu frame
-
-        # Create buttons for the right menu
-        self.mini_apps_button = RightMenuButton(self.right_menu_frame, 'miniapps')
-        self.mini_apps_button.place_by_index()  # Place the mini apps button at the top of the right menu
-
-        self.themes_button = RightMenuButton(self.right_menu_frame, 'themes')
-        self.themes_button.place_by_index(flags='toend')  # Place the themes button at the bottom of the right menu
+        ctk.set_appearance_mode('dark')  # Set the appearance mode of the application to light
 
         # Create a page for mini apps
         self.mini_apps_page = PageFrame(
@@ -239,6 +256,31 @@ class Main:
             page_title='Mini-Apps'
         )
         self.mini_apps_page.show()  # Show the mini apps page
+        
+        self.themes_page = PageFrame(
+            master=self.app,
+            page_title='Themes'
+        )
+
+        # Create a frame for the right menu
+        self.right_menu_frame = CTkFrame(
+            master=self.app,
+            width=50,
+            height=300,
+            fg_color=colors['dark_frame'],
+            corner_radius=0
+        )
+        self.right_menu_frame.place(x=0, y=0)  # Place the right menu frame at the top left corner
+
+        self.create_separated_line().place(x=49, y=0)  # Create a separated line and place it next to the right menu frame
+
+        # Create buttons for the right menu
+        self.mini_apps_button = RightMenuButton(self.right_menu_frame, 'miniapps', self.mini_apps_page)
+        self.mini_apps_button.place_by_index()  # Place the mini apps button at the top of the right menu
+        self.mini_apps_button.active_self(self.mini_apps_page)
+
+        self.themes_button = RightMenuButton(self.right_menu_frame, 'themes', self.themes_page)
+        self.themes_button.place_by_index(flags='toend')  # Place the themes button at the bottom of the right menu
 
         # Create a scrollable frame for the mini apps page
         self.scrollbar_frame = ctk.CTkScrollableFrame(
