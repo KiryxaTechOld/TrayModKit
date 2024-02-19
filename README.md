@@ -1,4 +1,4 @@
-# <img scr="icon.png" height="25" /> TrayModKit
+# <img scr="./icon.png" height="25" /> TrayModKit
 “TrayModKit” is an innovative set of mini-applications located in the system tray. It includes the following features:
 
 **- TrashTidy**: A mini trash bin that displays the fill level of the bin and allows you to clear it by pressing a button or on a schedule.
